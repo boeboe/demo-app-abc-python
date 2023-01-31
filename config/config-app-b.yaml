@@ -1,0 +1,21 @@
+---
+server:
+  name: app-b
+  port: 5001
+  debug: true
+traffic:
+  upstream_host: http://app-c:5002
+  delay:
+    enabled: true
+    rate: 10
+    from: 1
+    to: 3
+  error:
+    enabled: true
+    rate: 10
+    code: 404
+tracing:
+  endpoint: http://jaeger:9411/api/v2/spans
+  tags:
+    test: "This is a test tag for app-b"
+    custom: "May the Force be with you."

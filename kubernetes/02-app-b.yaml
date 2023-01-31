@@ -1,0 +1,94 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-b
+  namespace: ns-b
+  labels:
+    app: app-b
+    service: app-b
+spec:
+  ports:
+    - port: 80
+      targetPort: 5001
+      name: http
+  selector:
+    app: app-b
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-app-b
+  namespace: ns-b
+  labels:
+    app: app-b
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-b-config
+  namespace: ns-b
+data:
+  config.yaml: |
+    server:
+      name: app-b
+      port: 5001
+      debug: true
+    traffic:
+      upstream_host: http://app-c.ns-c
+      delay:
+        enabled: true
+        rate: 10
+        from: 1
+        to: 3
+      error:
+        enabled: true
+        rate: 10
+        code: 404
+    tracing:
+      endpoint: http://zipkin.istio-system.svc.cluster.local:9411/api/v2/spans
+      tags:
+        test: "This is a test tag for app-b"
+        custom: "May the Force be with you."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-b-v1
+  namespace: ns-b
+  labels:
+    app: app-b
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      app: app-b
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: app-b
+        version: v1
+    spec:
+      serviceAccountName: sa-app-b
+      containers:
+        - name: app-b
+          image: boeboe/demo-app-abc:0.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONF_FILE
+              value: /etc/app-abc/config.yaml
+          ports:
+            - name: http
+              containerPort: 5001
+          resources:
+            limits:
+              memory: "64Mi"
+              cpu: "128m"
+          volumeMounts:
+            - name: app-b-config
+              mountPath: /etc/app-abc
+      volumes:
+        - name: app-b-config
+          configMap:
+            name: app-b-config

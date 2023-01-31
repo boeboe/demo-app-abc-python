@@ -1,0 +1,19 @@
+---
+server:
+  name: app-c
+  port: 5002
+  debug: true
+traffic:
+  upstream_host:
+  delay:
+    enabled: true
+    rate: 10
+    from: 1
+    to: 3
+  error:
+    enabled: true
+    rate: 10
+    code: 404
+tracing:
+  endpoint: http://jaeger:9411/api/v2/spans
+  tags:

@@ -1,0 +1,92 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-c
+  namespace: ns-c
+  labels:
+    app: app-c
+    service: app-c
+spec:
+  ports:
+    - port: 80
+      targetPort: 5002
+      name: http
+  selector:
+    app: app-c
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-app-c
+  namespace: ns-c
+  labels:
+    app: app-c
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-c-config
+  namespace: ns-c
+data:
+  config.yaml: |
+    server:
+      name: app-c
+      port: 5002
+      debug: true
+    traffic:
+      upstream_host:
+      delay:
+        enabled: true
+        rate: 10
+        from: 1
+        to: 3
+      error:
+        enabled: true
+        rate: 10
+        code: 404
+    tracing:
+      endpoint: http://zipkin.istio-system.svc.cluster.local:9411/api/v2/spans
+      tags:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-c-v1
+  namespace: ns-c
+  labels:
+    app: app-c
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      app: app-c
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: app-c
+        version: v1
+    spec:
+      serviceAccountName: sa-app-c
+      containers:
+        - name: app-c
+          image: boeboe/demo-app-abc:0.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONF_FILE
+              value: /etc/app-abc/config.yaml
+          ports:
+            - name: http
+              containerPort: 5002
+          resources:
+            limits:
+              memory: "64Mi"
+              cpu: "128m"
+          volumeMounts:
+            - name: app-c-config
+              mountPath: /etc/app-abc
+      volumes:
+        - name: app-c-config
+          configMap:
+            name: app-c-config

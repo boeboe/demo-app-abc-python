@@ -1,0 +1,94 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-a
+  namespace: ns-a
+  labels:
+    app: app-a
+    service: app-a
+spec:
+  ports:
+    - port: 80
+      targetPort: 5000
+      name: http
+  selector:
+    app: app-a
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-app-a
+  namespace: ns-a
+  labels:
+    app: app-a
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-a-config
+  namespace: ns-a
+data:
+  config.yaml: |
+    server:
+      name: app-a
+      port: 5000
+      debug: true
+    traffic:
+      upstream_host: http://app-b.ns-b
+      delay:
+        enabled: true
+        rate: 10
+        from: 1
+        to: 3
+      error:
+        enabled: true
+        rate: 10
+        code: 404
+    tracing:
+      endpoint: http://zipkin.istio-system.svc.cluster.local:9411/api/v2/spans
+      tags:
+        message: "Hello from app-a"
+        quote: "There's no place like home."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-a-v1
+  namespace: ns-a
+  labels:
+    app: app-a
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      app: app-a
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: app-a
+        version: v1
+    spec:
+      serviceAccountName: sa-app-a
+      containers:
+        - name: app-a
+          image: boeboe/demo-app-abc:0.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONF_FILE
+              value: /etc/app-abc/config.yaml
+          ports:
+            - name: http
+              containerPort: 5000
+          resources:
+            limits:
+              memory: "64Mi"
+              cpu: "128m"
+          volumeMounts:
+            - name: app-a-config
+              mountPath: /etc/app-abc
+      volumes:
+        - name: app-a-config
+          configMap:
+            name: app-a-config
